@@ -1,0 +1,16 @@
+{
+    "program": {
+        "return": {
+            "expression": {
+                "minus": {
+                    "expression": {
+                        "number": 5
+                    }
+                    "expression": {
+                        "number": 4
+                    }
+                }
+            }
+        }
+    }
+}

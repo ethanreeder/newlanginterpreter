@@ -1,0 +1,9 @@
+{
+    "program": {
+        "return": {
+            "expression": {
+                "number": 5
+            }
+        }
+    }
+}
