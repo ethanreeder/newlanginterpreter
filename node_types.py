@@ -5,6 +5,11 @@ RETURN = 'return'
 # types
 NUMBER = 'number'
 STRING = 'string'
+BOOLEAN = 'boolean'
+
+# boolean values
+TRUE = 1
+FALSE = 0
 
 # arithmetic operators
 MINUS = 'minus'
@@ -22,6 +27,9 @@ FUNCTION_CALL = 'function_call'
 
 # keywords
 EXPRESSION = 'expression'
+STATEMENT = 'statement'
+BUILT_IN_FUNCTION = 'built_in_function'
+PARAMETER = 'parameter'
 
 # attributes
 NAME = 'name'

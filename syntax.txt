@@ -1,0 +1,95 @@
+Each file must contain a 'program' which is a list of 'statement'(s)
+
+{"program": [
+    {"statement": ...}
+    {"statement": ...}
+]}
+
+A 'statement' is a 'function_definition', a 'function_call', an 'if', or a 'return'
+
+{"statement": [
+    {"function_definition": ...}
+]}
+
+{"statement": [
+    {"function_call": ...},
+]}
+
+{"statement": [
+    {"if": ...}
+]}
+
+{"statement": [
+    {"return": ...}
+]}
+
+A 'function_definition' has a 'function_name', zero or more 'parameter'(s), and one or more 'statement'(s)
+
+{"function_definition": [
+    {"function_name": ...},
+    [
+        {"parameter": ...},
+        {"parameter": ...}
+    ],
+    [
+        {"statement": ...},
+        {"statement": ...}
+    ]
+]}
+
+An 'if' has an 'expression' and one or more 'statement'(s)
+
+{"if": [
+    {"expression": ...},
+    [
+        {"statement": ...},
+        {"statement": ...}
+    ]
+]}
+
+A 'return' has an 'expression'
+
+{"return": {"expression": ...}}
+
+A 'literal' is a number or string
+
+{"literal": 1}
+{"literal": "asdf"}
+
+An 'expression' is a 'literal', a 'function_call', a 'built_in_function', or a 'parameter'
+
+{"expression": {"number": ...}}
+{"expression": {"string": ...}}
+{"expression": {"parameter": ...}}
+{"expression": {"built_in_function": ...}}
+{"expression": {"parameter": ...}}
+
+A 'function_call' has a 'function_name' and zero or more 'expression'(s) which become the 'parameter'(s)
+
+{"function_call": [
+    {"function_name": ...},
+    [
+        {"expression": ...},
+        {"expression": ...}
+    ]
+]}
+
+A 'built_in_function' has a 'name' and two 'expression'(s)
+
+{"built_in_function":
+    {"name": ...},
+    [
+        {"expression": ...},
+        {"expression": ...}
+    ]
+}
+
+A 'function_name' is a 'string'
+
+{"function_name": "asdf"}
+
+A 'parameter' is a 'string'
+
+{"parameter": "asdf"}
+
+When a parameter is used as an expression, it evaluates to the value that was passed into the function call for that expression

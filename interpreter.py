@@ -1,7 +1,5 @@
 import sys
 from context import Context
-from context import VariableTable
-from context import FunctionTable
 from parser import Parser
 import node_types as NodeType
 from error import Error
@@ -21,6 +19,13 @@ class Interpreter:
                 return Error(ErrorType.INVALID_SYNTAX, "Expected program start token")
 
     def handle_program(self, node, context):
+        """
+        Execute first step of interpretation based on program keyword
+
+        :param node: the next level of the tree to visit
+        :param context: global context
+        :return: integer, float, string, or Error
+        """
         for child in node:
             if child == NodeType.FUNCTION_DEFINITION:
                 pass
@@ -29,88 +34,46 @@ class Interpreter:
             elif child == NodeType.IF:
                 return self.handle_expression(node[child], context)
             else:
-                return Error(ErrorType.INVALID_SYNTAX, 'Undefined node in abstract syntax tree')
+                return Error(ErrorType.INVALID_SYNTAX, 'Program included invalid child nodes')
 
-    def handle_return(self, node, context):
-        return self.handle_expression(node[NodeType.EXPRESSION], context)
+    def handle_statement(self, node, context):
+        """
+        Execute statement of function definition, if, or return and only return value if includes return statement
 
-    def handle_expression(self, node, context):
+        :param node: the next level of the tree to visit
+        :param context: global context
+        :return: integer, float, string, nothing, or Error
+        """
         for child in node:
-            if child == NodeType.NUMBER:
-                return node[NodeType.NUMBER]
-            elif child == NodeType.STRING:
-                return node[NodeType.STRING]
-
-            if child == NodeType.VARIABLE_ACCESS:
-                self.handle_variable_access(node, context)
-
-    def handle_built_in_function(self, node, context):
-        parameter_one = None
-        parameter_two = None
-
-        for child in node:
-            if child == NodeType.EXPRESSION:
-                if parameter_one is None:
-                    parameter_one = self.handle_expression(node[NodeType.EXPRESSION], context)
-                elif parameter_two is None:
-                    parameter_two  = self.handle_expression(node[NodeType.EXPRESSION], context)
-                else:
-                    return Error(ErrorType.INVALID_SYNTAX, "Expected only two parameters for binary operation")
-
-        for child in node:
-            if child == NodeType.EQUALITY:
-                return parameter_one == parameter_two
-            if child == NodeType.PLUS:
-                return parameter_one + parameter_two
-            if child == NodeType.MINUS:
-                return parameter_one + parameter_two
-
-        return Error(ErrorType.INVALID_SYNTAX, "Expected '+', '-', or '=='")
-
-    def handle_variable_declaration(self, node, context):
-        variable_name = None
-        variable_value = None
-
-        for child in node:
-            if child == NodeType.NAME:
-                variable_name = node[child]
-            if child == NodeType.VALUE:
-                variable_value = node[child]
-
-        if variable_name is None:
-            return Error(ErrorType.INVALID_SYNTAX, 'Defined variable with no name')
-
-        if variable_value is None:
-            return Error(ErrorType.INVALID_SYNTAX, 'Defined function with no value')
-
-        context.variable_table.set_value(variable_name, variable_value)
-        print('set variable')
-
-    def handle_variable_access(self, node, context):
-        for child in node:
-            if child == NodeType.NAME:
-                if child in context.variable_table:
-                    return context.variable_table.get_value(child)
-                else:
-                    return Error(ErrorType.INVALID_SYNTAX, 'Attempt to access undefined variable')
-
-        return Error(ErrorType.INVALID_SYNTAX, 'Attempt to access variable with no name')
+            if child == NodeType.FUNCTION_DEFINITION:
+                self.handle_statement(node[child], context)
+            if child == NodeType.IF:
+                self.handle_if(node[child], context)
+            if child == NodeType.RETURN:
+                return self.handle_expression(node[child], context)
+            else:
+                return Error(ErrorType.INVALID_SYNTAX, 'Statement included invalid child nodes')
 
     def handle_function_definition(self, node, context):
+        """
+        Identify function name, parameters, and statements and add to the function table in context of relevant scope
+
+        :param node: the next level of the tree to visit
+        :param context: global context
+        :return: integer, float, or string, or Error
+        """
         function_name = None
+        function_parameters = []
         function_statements = []
         function_variable_table = None
 
         for child in node:
             if child == NodeType.NAME:
                 function_name = node[child]
-                function_variable_table = VariableTable(context.variable_table, function_name)
-            elif child == NodeType.EXPRESSION:
-                function_statements.append({'expression': self.handle_expression(child, context)})
-            elif child == NodeType.VARIABLE_DECLARATION:
-                self.set_variable(node[child], function_variable_table)
-            elif child == NodeType.VARIABLE_ACCESS:
-                self.get_variable(node[child], function_variable_table)
+            elif child == NodeType.PARAMETER:
+                function_parameters.append(node[child])
+            elif child == NodeType.STATEMENT:
+                function_statements.append(node[child])
             elif child == NodeType.RETURN:
                 return self.handle_expression(node[child], context)
 
@@ -120,30 +83,171 @@ class Interpreter:
         if not function_statements:
             return Error(ErrorType.INVALID_SYNTAX, 'Defined function with no statements')
 
-        context.function_table.add_function(function_name, function_statements, function_variable_table)
+        context.function_table.add_function(function_name, function_parameters,
+                                            function_statements, function_variable_table)
+
+    def handle_if(self, node, context):
+        """
+        Execute if statement evaluating the provided expression
+        If evaluation is true, execute all statements, if false, do nothing
+
+        :param node: the next level of the tree to visit
+        :param context: global context
+        :return: n/a
+        """
+        expression = None
+        statements = []
+
+        for child in node:
+            if child == NodeType.EXPRESSION:
+                expression = self.handle_expression(node[child], context)
+            if child == NodeType.STATEMENT:
+                statements.append(self.handle_statement(node[child], context))
+
+        if expression is None:
+            return Error(ErrorType.INVALID_SYNTAX, "if statement has no expression to evaluate")
+
+        if not statements:
+            return Error(ErrorType.INVALID_SYNTAX, "if statement has no statements to execute")
+
+        if expression:
+            for statement in statements:
+                self.handle_statement(statement, context)
+
+    def handle_return(self, node, context):
+        """
+        Execute return statement
+
+        :param node: the next level of the tree to visit
+        :param context: global context
+        :return: integer, float, or string
+        """
+        return self.handle_expression(node[NodeType.EXPRESSION], context)
+
+    def handle_expression(self, node, context):
+        """
+        Evaluate an expression composed of nested other types, but culminating in a number or string
+
+        :param node: the next level of the tree to visit
+        :param context: global context
+        :return: integer, float, or string
+        """
+        for child in node:
+            if child == NodeType.NUMBER:
+                return node[NodeType.NUMBER]
+            elif child == NodeType.STRING:
+                return node[NodeType.STRING]
+            elif child == NodeType.FUNCTION_CALL:
+                return self.handle_function_call(node[child], context)
+            elif child == NodeType.BUILT_IN_FUNCTION:
+                return self.handle_built_in_function(node[child], context)
+            elif child == NodeType.PARAMETER:
+                return self.handle_parameter(node[child], context)
+            else:
+                return Error(ErrorType.INVALID_SYNTAX, "Expression contained invalid node type")
+
+    def handle_built_in_function(self, node, context):
+        """
+        Identify which built_in_function to use (all are binary operators)
+        and call it on the two provided expressions, returning the result
+
+        :param node: the next level of the tree to visit
+        :param context: global context
+        :return: integer, float, or boolean
+        """
+        function_name = None
+        expressions = []
+
+        for child in node:
+            if child == NodeType.EXPRESSION:
+                expressions.append(node[child])
+            if child == NodeType.EQUALITY:
+                if function_name is None:
+                    function_name = NodeType.EQUALITY
+                else:
+                    return Error(ErrorType.INVALID_SYNTAX, "More than one built in function name provided")
+            if child == NodeType.PLUS:
+                if function_name is None:
+                    function_name = NodeType.PLUS
+                else:
+                    return Error(ErrorType.INVALID_SYNTAX, "More than one built in function name provided")
+            if child == NodeType.MINUS:
+                if function_name is None:
+                    function_name = NodeType.MINUS
+                else:
+                    return Error(ErrorType.INVALID_SYNTAX, "More than one built in function name provided")
+
+        if function_name is None:
+            return Error(ErrorType.INVALID_SYNTAX, "No built in function name provided")
+
+        if len(expressions) != 2:
+            return Error(ErrorType.INVALID_SYNTAX, "Expected only two inputs for binary operation")
+
+        if function_name == NodeType.EQUALITY:
+            return self.handle_expression(expressions[0], context) == self.handle_expression(expressions[1], context)
+        elif function_name == NodeType.PLUS:
+            return self.handle_expression(expressions[0], context) + self.handle_expression(expressions[1], context)
+        elif function_name == NodeType.MINUS:
+            return self.handle_expression(expressions[0], context) - self.handle_expression(expressions[1], context)
+
+        return Error(ErrorType.INVALID_SYNTAX, "Unexpected built in function")
 
     def handle_function_call(self, node, context):
-        # function_name = None
-        # function_expressions = {}
-        #
-        # for child in node:
-        #     if child == NodeType.NAME:
-        #         function_name = node['name']
-        #     if child == NodeType.EXPRESSION:
-        #         function_expressions
-        pass
+        """
+        Identify function name, look up in function table in global context, and execute
 
-    def set_variable(self, node, variable_table):
-        variable_table.set_value(node['name'], node['value'])
+        :param node: the next level of the tree to visit
+        :param context: global context
+        :return: returns evaluation of function if there is a return statement, if not, returns nothing
+        """
+        function_name = None
+        function_expressions = []
 
-    def get_variable(self, node, variable_table):
-        variable_table.get_value(node['name'])
+        for child in node:
+            if child == NodeType.NAME:
+                function_name = node[child]
+            if child == NodeType.EXPRESSION:
+                function_expressions.append(node[child])
+
+        if function_name is None:
+            return Error(ErrorType.INVALID_SYNTAX, 'Called function without name as identifier')
+
+        if function_name not in context.function_table:
+            return Error(ErrorType.INVALID_SYNTAX, 'Called undefined function')
+
+        if len(function_expressions) != context.function_table.num_parameters:
+            return Error(ErrorType.INVALID_SYNTAX,
+                         f"Function {function_name} expected {context.function_table.num_parameters} parameters " +
+                         f"but received {len(function_expressions)} parameters")
+
+        function = context.function_table[function_name]
+
+        for statement in function.statements:
+            if NodeType.RETURN in statement:
+                return self.handle_statement(statement, context)
+            else:
+                self.handle_statement(statement, context)
+
+    def handle_parameter(self, node, context):
+        """
+        Return string parameter
+        Not to useful right now, but potential for expansion and necessary if variables are added
+
+        :param node: the next level of the tree to visit
+        :param context: global context
+        :return: string
+        """
+        return node
 
 
 def main():
     """
+    Take in a file from user input, parse file and interpret parsed text, show output or error with details
+
+    :return: string, integer, float, or Error
     """
     context = Context()
+    fn = None
 
     if len(sys.argv) > 1:
         index = 1
@@ -162,14 +266,11 @@ def main():
         print(ast)
         return
 
-    # print(ast)
-    # print(ast[NodeType.PROGRAM])
-
     interpreter = Interpreter(ast, context)
     result = interpreter.interpret(ast, context)
 
     print(result)
-
+    return result
 
 
 main()
